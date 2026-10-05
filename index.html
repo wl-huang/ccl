@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>幸運刮刮卡 | LUCKY SCRATCH</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti 慶祝彩花 -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700;900&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+    
+    /* 街機科技字體與自訂樣式 */
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .font-arcade {
+      font-family: 'Chakra Petch', sans-serif;
+    }
+    
+    /* 霓虹邊框與發光特效 */
+    .neon-border {
+      box-shadow: 0 0 15px rgba(236, 72, 153, 0.4), inset 0 0 15px rgba(168, 85, 247, 0.2);
+    }
+    .neon-text-gold {
+      text-shadow: 0 0 10px rgba(251, 191, 36, 0.8), 0 0 20px rgba(245, 158, 11, 0.5);
+    }
+    .neon-text-cyan {
+      text-shadow: 0 0 8px rgba(34, 211, 238, 0.8), 0 0 16px rgba(6, 182, 212, 0.5);
+    }
+    
+    /* 刮刮卡格位觸控優化 */
+    .scratch-cell {
+      touch-action: none;
+    }
+    
+    /* 自訂捲軸樣式 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.8);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(168, 85, 247, 0.5);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-[#080711] text-slate-100 min-h-screen flex flex-col items-center justify-start p-3 sm:p-6 overflow-x-hidden relative selection:bg-pink-600 selection:text-white">
+  
+  <!-- 背景星空與氛圍光暈 -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-purple-700/20 rounded-full blur-[120px]"></div>
+    <div class="absolute top-1/3 -right-40 w-96 h-96 bg-pink-700/20 rounded-full blur-[120px]"></div>
+    <div class="absolute -bottom-40 left-1/3 w-96 h-96 bg-blue-700/20 rounded-full blur-[120px]"></div>
+    <!-- 幾何星際網格背景 -->
+    <div class="w-full h-full opacity-10 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:28px_28px]"></div>
+  </div>
+
+  <div class="w-full max-w-4xl z-10 flex flex-col items-center gap-5">
+    
+    <!-- 頂部街機風格 Logo 與安全狀態列 -->
+    <header class="w-full flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-purple-500/30 pb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-fuchsia-600 to-amber-400 flex items-center justify-center shadow-lg shadow-pink-500/30">
+          <svg class="w-6 h-6 text-slate-950 font-bold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-black tracking-wider bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 bg-clip-text text-transparent">
+            幸運刮刮卡 · 自訂抽獎
+          </h1>
+          <p class="text-xs text-purple-300/70 font-mono">LUCKY SCRATCH LOTTERY SYSTEM</p>
+        </div>
+      </div>
+
+      <!-- 防作弊與音效狀態指示 -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 text-xs font-mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>防作弊封裝啟用</span>
+        </div>
+        <button id="btn-sound-toggle" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors" title="切換音效">
+          <svg id="icon-sound-on" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <svg id="icon-sound-off" class="w-4 h-4 hidden text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 控制面板：M*N 參數設定、中獎號碼設定與功能按鈕 -->
+    <section class="w-full bg-slate-900/80 backdrop-blur-md border border-purple-500/20 rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col gap-4">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+        
+        <!-- 列數 M (Rows) -->
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-slate-400">列數 (Rows - M)</label>
+          <input id="input-rows" type="number" min="1" max="15" value="8" 
+                 class="w-full bg-slate-950/80 border border-slate-700 focus:border-pink-500 rounded-xl px-3 py-2 text-white font-mono text-center outline-none transition-colors">
+        </div>
+
+        <!-- 欄數 N (Columns) -->
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-slate-400">欄數 (Cols - N)</label>
+          <input id="input-cols" type="number" min="1" max="10" value="5" 
+                 class="w-full bg-slate-950/80 border border-slate-700 focus:border-pink-500 rounded-xl px-3 py-2 text-white font-mono text-center outline-none transition-colors">
+        </div>
+
+        <!-- 中獎號碼設定方式 -->
+        <div class="flex flex-col gap-1 col-span-2 sm:col-span-2">
+          <div class="flex justify-between items-center">
+            <label class="text-xs font-semibold text-slate-400">指定中獎號碼</label>
+            <label class="text-xs text-purple-400 flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" id="check-auto-target" checked class="rounded bg-slate-800 accent-pink-500">
+              開局系統隨機挑選
+            </label>
+          </div>
+          <div class="flex gap-2">
+            <input id="input-target-num" type="number" placeholder="自訂數字" disabled
+                   class="w-full bg-slate-950/80 border border-slate-700 disabled:opacity-40 focus:border-pink-500 rounded-xl px-3 py-2 text-white font-mono text-center outline-none transition-colors">
+            <button id="btn-dice" type="button" class="px-3 bg-purple-900/50 hover:bg-purple-800/80 border border-purple-500/40 rounded-xl text-purple-300 transition-colors" title="隨機重挑">
+              🎲
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 操作按鈕列 -->
+      <div class="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-800">
+        <div class="flex items-center gap-2">
+          <button id="btn-generate" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-pink-600/30 active:scale-95 transition-transform flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            生成全新卡片
+          </button>
+          <button id="btn-reshuffle" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-sm active:scale-95 transition-transform" title="維持目前行列，重新洗牌位置">
+            重新洗牌
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2 ml-auto">
+          <button id="btn-reveal-all" class="px-3.5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-semibold text-sm active:scale-95 transition-transform flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            一鍵全刮開
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 實體擬真卡片主體 (參考附圖排版) -->
+    <div id="physical-card" class="w-full max-w-xl bg-gradient-to-b from-[#181135] via-[#100d27] to-[#0d091e] border-2 border-fuchsia-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl relative overflow-hidden neon-border">
+      
+      <!-- 卡片頂部裝飾霓虹光帶 -->
+      <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-cyan-400 via-pink-500 to-amber-400"></div>
+
+      <!-- 頂部資訊看板 (醒目展示指定中獎號碼) -->
+      <div class="w-full bg-[#1e1445]/90 border border-purple-400/40 rounded-2xl p-3 sm:p-4 mb-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-inner">
+        
+        <div class="flex items-center gap-3">
+          <div class="px-2.5 py-1 rounded-lg bg-pink-600/30 border border-pink-400/40 text-pink-300 text-xs font-bold tracking-wider">
+            LUCKY SCRATCH
+          </div>
+          <div class="text-xs sm:text-sm font-bold text-slate-300 tracking-wide">
+            幸運刮刮卡 · 刮中指定號碼立即中獎
+          </div>
+        </div>
+
+        <!-- 醒目指定中獎號碼看板 -->
+        <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <div class="text-xs sm:text-sm font-bold text-amber-300 whitespace-nowrap flex items-center gap-1">
+            <span>🎯</span> 指定中獎號碼
+          </div>
+          <div class="bg-black/80 border-2 border-amber-400/80 rounded-xl px-4 py-1.5 min-w-[100px] text-center shadow-[0_0_15px_rgba(251,191,36,0.3)]">
+            <span id="display-target-number" class="font-arcade text-2xl sm:text-3xl font-black text-amber-300 tracking-widest neon-text-gold">
+              ---
+            </span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 進度狀態條 -->
+      <div class="flex items-center justify-between text-xs text-purple-300/80 px-1 mb-3 font-mono">
+        <span id="label-scratched-count">已刮開：0 / 40</span>
+        <span id="label-total-range">號碼範圍：001 ～ 040</span>
+      </div>
+
+      <!-- 刮刮卡格位容器 (CSS Grid，動態設定欄數) -->
+      <div class="w-full bg-[#130d2e]/90 border border-purple-500/30 rounded-2xl p-3 sm:p-4 shadow-inner">
+        <div id="grid-container" class="grid gap-2 sm:gap-3 w-full justify-center">
+          <!-- 格位動態由 JavaScript 建立 -->
+        </div>
+      </div>
+
+      <!-- 卡片底部仿真條碼與防偽序號 -->
+      <div class="mt-5 pt-3 border-t border-purple-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-400 text-xs">
+        <div class="flex items-center gap-2">
+          <!-- 仿真條碼 SVG -->
+          <div class="bg-white px-2 py-1 rounded flex items-center h-8">
+            <svg class="h-6 w-36" viewBox="0 0 144 24" fill="black">
+              <rect x="0" width="3" height="24"/><rect x="5" width="2" height="24"/><rect x="9" width="4" height="24"/><rect x="15" width="2" height="24"/><rect x="19" width="3" height="24"/><rect x="25" width="1" height="24"/><rect x="28" width="4" height="24"/><rect x="34" width="2" height="24"/><rect x="38" width="3" height="24"/><rect x="43" width="1" height="24"/><rect x="46" width="3" height="24"/><rect x="51" width="4" height="24"/><rect x="57" width="2" height="24"/><rect x="62" width="1" height="24"/><rect x="65" width="4" height="24"/><rect x="71" width="3" height="24"/><rect x="76" width="2" height="24"/><rect x="80" width="4" height="24"/><rect x="86" width="1" height="24"/><rect x="90" width="3" height="24"/><rect x="95" width="2" height="24"/><rect x="99" width="4" height="24"/><rect x="105" width="1" height="24"/><rect x="108" width="3" height="24"/><rect x="113" width="4" height="24"/><rect x="119" width="2" height="24"/><rect x="123" width="1" height="24"/><rect x="126" width="4" height="24"/><rect x="132" width="2" height="24"/><rect x="136" width="3" height="24"/><rect x="141" width="3" height="24"/>
+            </svg>
+          </div>
+          <span class="font-mono text-[10px] text-purple-300/50">SEC-8829-LUCKY</span>
+        </div>
+        <div class="flex items-center gap-2 font-mono text-[11px] text-pink-400/80">
+          <span>● 一旦刮開即無法復原</span>
+          <span class="text-slate-600">|</span>
+          <span>防作弊加密校驗已通過</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 刮卡操作提示 -->
+    <div class="text-center text-xs text-purple-300/60 flex items-center gap-2">
+      <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
+      <span>支援手機觸控與滑鼠塗抹 · 刮除達 40% 面積將自動平滑揭曉號碼</span>
+    </div>
+
+  </div>
+
+  <!-- 中獎慶祝彈窗 (完全自訂，不使用原生 alert) -->
+  <div id="modal-win" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden transition-all duration-300">
+    <div class="w-full max-w-sm bg-gradient-to-b from-[#24134b] to-[#12082b] border-2 border-amber-400 rounded-3xl p-6 text-center shadow-[0_0_50px_rgba(251,191,36,0.6)] transform scale-95 transition-transform duration-300" id="modal-win-box">
+      <div class="w-20 h-20 mx-auto -mt-12 bg-gradient-to-tr from-amber-400 to-pink-500 rounded-2xl flex items-center justify-center shadow-xl shadow-amber-400/40 border-2 border-white mb-4 animate-bounce">
+        <span class="text-4xl">👑</span>
+      </div>
+      <h3 class="text-2xl font-black bg-gradient-to-r from-amber-300 via-pink-400 to-amber-200 bg-clip-text text-transparent mb-1">
+        🎉 恭喜中獎！
+      </h3>
+      <p class="text-sm text-slate-300 mb-4">幸運之星降臨！成功刮出指定中獎號碼！</p>
+      
+      <div class="bg-black/60 border border-amber-400/60 rounded-2xl py-3 px-6 mb-5">
+        <div class="text-xs text-amber-300/80 mb-1">中獎號碼</div>
+        <div id="modal-win-number" class="font-arcade text-4xl font-black text-amber-300 tracking-widest neon-text-gold">
+          000
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button id="btn-modal-close" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-pink-600 hover:from-amber-400 hover:to-pink-500 text-slate-950 font-black text-base shadow-lg shadow-amber-500/30 active:scale-95 transition-transform">
+          領取榮耀（繼續遊戲）
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 一般訊息浮動提示 (Toast) -->
+  <div id="toast" class="fixed bottom-6 z-50 px-4 py-2.5 rounded-xl bg-slate-900/95 border border-purple-500/50 text-slate-200 text-sm shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <span id="toast-icon">ℹ️</span>
+    <span id="toast-text">訊息提示</span>
+  </div>
+
+  <script>
+  /**
+   * 街機刮刮卡主程式
+   * 嚴密防作弊措施：
+   * 1. 整個邏輯包裝在 IIFE 閉包中，絕不將資料陣列或狀態暴露給 window
+   * 2. 底層號碼使用純 Canvas 繪製，絕不在 DOM 建立任何包含號碼的標籤或 data 屬性
+   * 3. 封鎖常見開發者工具熱鍵 (F12, Ctrl+Shift+I/J/C, Ctrl+U) 及右鍵選單
+   * 4. 產生卡面後清空記憶體臨時數據
+   */
+  (() => {
+    'use strict';
+
+    // --- 音效系統 (使用 Web Audio API，無需外聯音檔) ---
+    const Sound = (() => {
+      let ctx = null;
+      let isMuted = false;
+
+      function getContext() {
+        if (!ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) ctx = new AudioContext();
+        }
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        return ctx;
+      }
+
+      return {
+        toggleMute() {
+          isMuted = !isMuted;
+          return isMuted;
+        },
+        isMuted() {
+          return isMuted;
+        },
+        // 刮膜摩擦音效 (輕柔白噪音脈衝)
+        playScratch() {
+          if (isMuted) return;
+          try {
+            const ac = getContext();
+            if (!ac) return;
+            const bufferSize = ac.sampleRate * 0.04;
+            const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+              data[i] = Math.random() * 2 - 1;
+            }
+            const noise = ac.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = ac.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1400;
+            filter.Q.value = 2.0;
+
+            const gain = ac.createGain();
+            gain.gain.setValueAtTime(0.06, ac.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.04);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(ac.destination);
+
+            noise.start();
+          } catch (e) {
+            // 音訊在無使用者互動前可能靜音，容錯跳過
+          }
+        },
+        // 格子揭開平滑音效
+        playReveal() {
+          if (isMuted) return;
+          try {
+            const ac = getContext();
+            if (!ac) return;
+            const osc = ac.createOscillator();
+            const gain = ac.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, ac.currentTime); // D5
+            osc.frequency.exponentialRampToValueAtTime(880, ac.currentTime + 0.12); // A5
+
+            gain.gain.setValueAtTime(0.12, ac.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
+
+            osc.connect(gain);
+            gain.connect(ac.destination);
+            osc.start();
+            osc.stop(ac.currentTime + 0.15);
+          } catch (e) {}
+        },
+        // 勝利慶祝和弦音效
+        playVictory() {
+          if (isMuted) return;
+          try {
+            const ac = getContext();
+            if (!ac) return;
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            notes.forEach((freq, idx) => {
+              const osc = ac.createOscillator();
+              const gain = ac.createGain();
+              osc.type = 'triangle';
+              osc.frequency.value = freq;
+              const startTime = ac.currentTime + idx * 0.08;
+              gain.gain.setValueAtTime(0.2, startTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.6);
+              osc.connect(gain);
+              gain.connect(ac.destination);
+              osc.start(startTime);
+              osc.stop(startTime + 0.65);
+            });
+          } catch (e) {}
+        }
+      };
+    })();
+
+    // --- 實施前端反作弊機制 ---
+    function initAntiCheat() {
+      // 1. 禁用右鍵選單
+      document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showToast('🛡️ 系統保護模式已鎖定右鍵選單');
+        return false;
+      });
+
+      // 2. 封鎖常見開發者工具熱鍵 (F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U)
+      window.addEventListener('keydown', (e) => {
+        const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+        if (
+          e.key === 'F12' ||
+          (isCtrlOrMeta && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+          (isCtrlOrMeta && (e.key === 'U' || e.key === 'u'))
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          showToast('⚠️️ 為了遊戲公平，已停用檢視工具');
+          return false;
+        }
+      });
+
+      // 3. 控制台警告輸出
+      if (window.console) {
+        console.log(
+          '%c🛑 防作弊模式已啟動%c\n本刮刮卡所有底層號碼均使用純像素繪製並封裝於獨立閉包，DOM 中無任何號碼資料。請享受真實刮卡的樂趣！',
+          'color: #f43f5e; font-size: 20px; font-weight: bold;',
+          'color: #a855f7; font-size: 13px;'
+        );
+      }
+    }
+
+    // --- 核心狀態管理 (完全不綁定至 window) ---
+    let state = {
+      rows: 8,
+      cols: 5,
+      totalCells: 40,
+      targetNumber: 0,
+      targetNumberFormatted: '000',
+      digits: 3,
+      scratchedCount: 0,
+      hasWon: false,
+      cells: [] // 每個格子的控制器實例
+    };
+
+    // DOM 元素引用
+    const elInputRows = document.getElementById('input-rows');
+    const elInputCols = document.getElementById('input-cols');
+    const elInputTargetNum = document.getElementById('input-target-num');
+    const elCheckAutoTarget = document.getElementById('check-auto-target');
+    const elBtnDice = document.getElementById('btn-dice');
+    const elBtnGenerate = document.getElementById('btn-generate');
+    const elBtnReshuffle = document.getElementById('btn-reshuffle');
+    const elBtnRevealAll = document.getElementById('btn-reveal-all');
+    const elGridContainer = document.getElementById('grid-container');
+    const elDisplayTarget = document.getElementById('display-target-number');
+    const elLabelScratched = document.getElementById('label-scratched-count');
+    const elLabelRange = document.getElementById('label-total-range');
+    const elModalWin = document.getElementById('modal-win');
+    const elModalWinBox = document.getElementById('modal-win-box');
+    const elModalWinNumber = document.getElementById('modal-win-number');
+    const elBtnModalClose = document.getElementById('btn-modal-close');
+    const elToast = document.getElementById('toast');
+    const elToastText = document.getElementById('toast-text');
+    const elBtnSoundToggle = document.getElementById('btn-sound-toggle');
+    const elIconSoundOn = document.getElementById('icon-sound-on');
+    const elIconSoundOff = document.getElementById('icon-sound-off');
+
+    // 格式化補零：總數若為 40，則至少補到 3 位數 (001...040)
+    function formatNumber(num, digits) {
+      return String(num).padStart(digits, '0');
+    }
+
+    // 計算格式位數
+    function getDigits(total) {
+      return Math.max(3, String(total).length);
+    }
+
+    // Fisher-Yates 隨機洗牌演算法
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    // 輕量 Toast 通知
+    let toastTimer = null;
+    function showToast(text, icon = 'ℹ️') {
+      if (toastTimer) clearTimeout(toastTimer);
+      elToastText.textContent = text;
+      document.getElementById('toast-icon').textContent = icon;
+      elToast.classList.remove('translate-y-20', 'opacity-0');
+      elToast.classList.add('translate-y-0', 'opacity-100');
+      toastTimer = setTimeout(() => {
+        elToast.classList.remove('translate-y-0', 'opacity-100');
+        elToast.classList.add('translate-y-20', 'opacity-0');
+      }, 2500);
+    }
+
+    /**
+     * 單一刮刮卡格子元件
+     * 架構：
+     * - 外層 DOM 容器 (無任何號碼資訊)
+     * - 底層 Canvas (cBase)：繪製數字與格紋背景
+     * - 頂層 Canvas (cCover)：繪製金屬塗層與刮除圖形
+     */
+    function createScratchCell(numberVal, formattedText, onRevealed) {
+      const cellWrapper = document.createElement('div');
+      cellWrapper.className = 'scratch-cell relative w-full aspect-square rounded-full overflow-hidden shadow-md border border-purple-500/20 bg-slate-900 select-none';
+
+      // 1. 底層 Canvas (純像素顯示號碼，防止 DOM 被檢查)
+      const canvasBase = document.createElement('canvas');
+      canvasBase.className = 'absolute inset-0 w-full h-full pointer-events-none rounded-full';
+      
+      // 2. 頂層遮罩 Canvas (供玩家刮除)
+      const canvasCover = document.createElement('canvas');
+      canvasCover.className = 'absolute inset-0 w-full h-full cursor-crosshair rounded-full z-10 transition-opacity duration-300';
+
+      cellWrapper.appendChild(canvasBase);
+      cellWrapper.appendChild(canvasCover);
+
+      const ctxBase = canvasBase.getContext('2d');
+      const ctxCover = canvasCover.getContext('2d');
+
+      let isRevealed = false;
+      let isDrawing = false;
+      let lastX = 0;
+      let lastY = 0;
+      let checkThrottleTimer = null;
+      let cellWidth = 0;
+      let cellHeight = 0;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      // 初始化畫布尺寸 (高解析度 Retina 支援)
+      function initDimensions() {
+        const rect = cellWrapper.getBoundingClientRect();
+        cellWidth = Math.max(rect.width, 36);
+        cellHeight = Math.max(rect.height, 36);
+
+        canvasBase.width = cellWidth * dpr;
+        canvasBase.height = cellHeight * dpr;
+        canvasCover.width = cellWidth * dpr;
+        canvasCover.height = cellHeight * dpr;
+
+        ctxBase.scale(dpr, dpr);
+        ctxCover.scale(dpr, dpr);
+
+        drawBase();
+        drawCover();
+      }
+
+      // 繪製底層（白色圓盤底色 + 黑色字體，與附圖樣式一致）
+      function drawBase() {
+        const w = cellWidth;
+        const h = cellHeight;
+        ctxBase.clearRect(0, 0, w, h);
+
+        // 柔和白色底色
+        ctxBase.fillStyle = '#ffffff';
+        ctxBase.beginPath();
+        ctxBase.arc(w / 2, h / 2, w / 2 - 1, 0, Math.PI * 2);
+        ctxBase.fill();
+
+        // 邊緣精緻陰影內圈
+        ctxBase.strokeStyle = '#e2e8f0';
+        ctxBase.lineWidth = 1.5;
+        ctxBase.stroke();
+
+        // 繪製防偽斜紋微縮字底紋 (極高質感)
+        ctxBase.save();
+        ctxBase.strokeStyle = 'rgba(203, 213, 225, 0.4)';
+        ctxBase.lineWidth = 1;
+        for (let i = -w; i < w * 2; i += 6) {
+          ctxBase.beginPath();
+          ctxBase.moveTo(i, 0);
+          ctxBase.lineTo(i + h, h);
+          ctxBase.stroke();
+        }
+        ctxBase.restore();
+
+        // 繪製幸運號碼 (純像素渲染，DOM 中完全無此字串)
+        ctxBase.fillStyle = '#0f172a';
+        ctxBase.textAlign = 'center';
+        ctxBase.textBaseline = 'middle';
+        // 依照圓形尺寸動態縮放字體
+        const fontSize = Math.floor(w * 0.42);
+        ctxBase.font = `900 ${fontSize}px 'Chakra Petch', sans-serif`;
+        ctxBase.fillText(formattedText, w / 2, h / 2 + 1);
+      }
+
+      // 繪製頂層（黑銀微金屬光澤塗層 + 擬真刮膜微粒）
+      function drawCover() {
+        const w = cellWidth;
+        const h = cellHeight;
+        ctxCover.clearRect(0, 0, w, h);
+
+        // 金屬黑漸層基底 (比照附圖深色圓圈)
+        const grad = ctxCover.createRadialGradient(
+          w * 0.35, h * 0.35, w * 0.05,
+          w * 0.5, h * 0.5, w * 0.55
+        );
+        grad.addColorStop(0, '#2d2e38');
+        grad.addColorStop(0.4, '#1a1b24');
+        grad.addColorStop(0.85, '#12131a');
+        grad.addColorStop(1, '#0b0c10');
+
+        ctxCover.fillStyle = grad;
+        ctxCover.beginPath();
+        ctxCover.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2);
+        ctxCover.fill();
+
+        // 噴塗微細銀光顆粒紋理 (增添仿真刮膜質感)
+        ctxCover.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        for (let i = 0; i < 40; i++) {
+          const rx = Math.random() * w;
+          const ry = Math.random() * h;
+          if (Math.hypot(rx - w / 2, ry - h / 2) < w / 2 - 2) {
+            ctxCover.fillRect(rx, ry, 1.2, 1.2);
+          }
+        }
+
+        // 外圈立體反光邊緣
+        ctxCover.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctxCover.lineWidth = 1;
+        ctxCover.stroke();
+      }
+
+      // 刮除筆刷設定
+      function scratchAt(x, y) {
+        if (isRevealed) return;
+        ctxCover.save();
+        ctxCover.globalCompositeOperation = 'destination-out';
+        ctxCover.lineWidth = Math.max(cellWidth * 0.36, 16);
+        ctxCover.lineCap = 'round';
+        ctxCover.lineJoin = 'round';
+
+        ctxCover.beginPath();
+        ctxCover.moveTo(lastX, lastY);
+        ctxCover.lineTo(x, y);
+        ctxCover.stroke();
+
+        // 在接觸點畫圓以消除折點生硬感
+        ctxCover.beginPath();
+        ctxCover.arc(x, y, ctxCover.lineWidth / 2, 0, Math.PI * 2);
+        ctxCover.fill();
+        ctxCover.restore();
+
+        lastX = x;
+        lastY = y;
+
+        Sound.playScratch();
+      }
+
+      // 檢查刮除進度 (像素取樣計算透明度比率)
+      function checkScratchProgress() {
+        if (isRevealed) return;
+        try {
+          const rawW = canvasCover.width;
+          const rawH = canvasCover.height;
+          const imgData = ctxCover.getImageData(0, 0, rawW, rawH);
+          const pixels = imgData.data;
+          let transparentPixels = 0;
+          let totalSampled = 0;
+
+          // 以步長 16 抽樣加速運算
+          for (let i = 3; i < pixels.length; i += 16) {
+            totalSampled++;
+            if (pixels[i] < 128) {
+              transparentPixels++;
+            }
+          }
+
+          const ratio = transparentPixels / totalSampled;
+          // 若刮開面積達 40%，自動揭曉全格
+          if (ratio >= 0.40) {
+            revealSmoothly();
+          }
+        } catch (e) {
+          // 容錯防護
+        }
+      }
+
+      // 平滑完全揭曉該格
+      function revealSmoothly(triggerCallback = true) {
+        if (isRevealed) return;
+        isRevealed = true;
+
+        canvasCover.style.opacity = '0';
+        canvasCover.style.pointerEvents = 'none';
+
+        Sound.playReveal();
+
+        setTimeout(() => {
+          ctxCover.clearRect(0, 0, cellWidth, cellHeight);
+        }, 320);
+
+        if (triggerCallback && onRevealed) {
+          onRevealed(numberVal, formattedText, cellWrapper);
+        }
+      }
+
+      // 事件監聽 (支援 PointerEvents，相容滑鼠與手機觸控)
+      function getPos(e) {
+        const rect = canvasCover.getBoundingClientRect();
+        return {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        };
+      }
+
+      canvasCover.addEventListener('pointerdown', (e) => {
+        if (isRevealed) return;
+        canvasCover.setPointerCapture(e.pointerId);
+        isDrawing = true;
+        const pos = getPos(e);
+        lastX = pos.x;
+        lastY = pos.y;
+        scratchAt(pos.x, pos.y);
+      });
+
+      canvasCover.addEventListener('pointermove', (e) => {
+        if (!isDrawing || isRevealed) return;
+        const pos = getPos(e);
+        scratchAt(pos.x, pos.y);
+
+        // 節流抽樣計算進度
+        if (!checkThrottleTimer) {
+          checkThrottleTimer = setTimeout(() => {
+            checkScratchProgress();
+            checkThrottleTimer = null;
+          }, 100);
+        }
+      });
+
+      function stopDrawing(e) {
+        if (!isDrawing) return;
+        isDrawing = false;
+        try {
+          if (e && e.pointerId) canvasCover.releasePointerCapture(e.pointerId);
+        } catch (err) {}
+        checkScratchProgress();
+      }
+
+      canvasCover.addEventListener('pointerup', stopDrawing);
+      canvasCover.addEventListener('pointercancel', stopDrawing);
+
+      return {
+        dom: cellWrapper,
+        initDimensions,
+        revealSmoothly,
+        isRevealed: () => isRevealed,
+        getNumberVal: () => numberVal,
+        markAsWinner: () => {
+          // 中獎金光閃爍環
+          cellWrapper.classList.add('ring-4', 'ring-amber-400', 'ring-offset-2', 'ring-offset-purple-950', 'animate-pulse');
+        }
+      };
+    }
+
+    // --- 建立與重置刮刮卡面板 ---
+    function generateCard(preserveConfig = false) {
+      const rows = parseInt(elInputRows.value, 10);
+      const cols = parseInt(elInputCols.value, 10);
+
+      // 輸入校驗
+      if (isNaN(rows) || rows < 1 || rows > 15) {
+        showToast('列數請輸入 1 ～ 15 之間的數字', '⚠️');
+        return;
+      }
+      if (isNaN(cols) || cols < 1 || cols > 10) {
+        showToast('欄數請輸入 1 ～ 10 之間的數字', '⚠️');
+        return;
+      }
+
+      const total = rows * cols;
+      if (total > 150) {
+        showToast('格子總數上限為 150 格，請調整行列數', '⚠️');
+        return;
+      }
+
+      state.rows = rows;
+      state.cols = cols;
+      state.totalCells = total;
+      state.digits = getDigits(total);
+      state.scratchedCount = 0;
+      state.hasWon = false;
+      state.cells = [];
+
+      // 決定中獎號碼
+      let target = 1;
+      if (elCheckAutoTarget.checked) {
+        target = Math.floor(Math.random() * total) + 1;
+        elInputTargetNum.value = target;
+      } else {
+        const manualTarget = parseInt(elInputTargetNum.value, 10);
+        if (isNaN(manualTarget) || manualTarget < 1 || manualTarget > total) {
+          target = Math.floor(Math.random() * total) + 1;
+          elInputTargetNum.value = target;
+          showToast(`自訂號碼無效，已為您隨機指定 ${formatNumber(target, state.digits)}`, '🎲');
+        } else {
+          target = manualTarget;
+        }
+      }
+
+      state.targetNumber = target;
+      state.targetNumberFormatted = formatNumber(target, state.digits);
+
+      // 更新頂部看板顯示
+      elDisplayTarget.textContent = state.targetNumberFormatted;
+      elLabelScratched.textContent = `已刮開：0 / ${total}`;
+      elLabelRange.textContent = `號碼範圍：${formatNumber(1, state.digits)} ～ ${formatNumber(total, state.digits)}`;
+
+      // 產生 1 ~ (M*N) 數字陣列並隨機打散 (Fisher-Yates)
+      const rawNumbers = [];
+      for (let i = 1; i <= total; i++) {
+        rawNumbers.push(i);
+      }
+      const shuffledNumbers = shuffleArray(rawNumbers);
+
+      // 清空舊格位容器
+      elGridContainer.innerHTML = '';
+      elGridContainer.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+      // 依序建立每個刮卡格位
+      shuffledNumbers.forEach((num) => {
+        const formatted = formatNumber(num, state.digits);
+        const cell = createScratchCell(num, formatted, handleCellRevealed);
+        state.cells.push(cell);
+        elGridContainer.appendChild(cell.dom);
+      });
+
+      // 立即銷毀記憶體中的陣列參考 (防作弊強化)
+      rawNumbers.length = 0;
+      shuffledNumbers.length = 0;
+
+      // 等待 DOM 渲染完畢後初始化各格尺寸
+      requestAnimationFrame(() => {
+        state.cells.forEach(c => c.initDimensions());
+      });
+
+      showToast(`已生成 ${rows}×${cols} 共 ${total} 格全新刮刮卡`, '✨');
+    }
+
+    // 格子揭開時的回呼
+    function handleCellRevealed(revealedNum, formattedText, cellDom) {
+      state.scratchedCount++;
+      elLabelScratched.textContent = `已刮開：${state.scratchedCount} / ${state.totalCells}`;
+
+      // 中獎判定
+      if (revealedNum === state.targetNumber && !state.hasWon) {
+        state.hasWon = true;
+
+        // 該格高亮閃爍
+        const hitCell = state.cells.find(c => c.getNumberVal() === revealedNum);
+        if (hitCell) hitCell.markAsWinner();
+
+        // 播放勝利音效
+        Sound.playVictory();
+
+        // 噴灑慶祝彩帶
+        triggerConfetti();
+
+        // 顯示中獎彈窗
+        setTimeout(() => {
+          showWinModal(formattedText);
+        }, 350);
+      }
+    }
+
+    // 觸發全螢幕勝利彩花 (Canvas Confetti)
+    function triggerConfetti() {
+      if (typeof confetti !== 'function') return;
+      const count = 200;
+      const defaults = { origin: { y: 0.7 } };
+
+      function fire(particleRatio, opts) {
+        confetti(Object.assign({}, defaults, opts, {
+          particleCount: Math.floor(count * particleRatio)
+        }));
+      }
+
+      fire(0.25, { spread: 26, startVelocity: 55, colors: ['#fbbf24', '#f43f5e', '#a855f7'] });
+      fire(0.2, { spread: 60 });
+      fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+      fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, colors: ['#38bdf8', '#34d399'] });
+      fire(0.1, { spread: 120, startVelocity: 45 });
+    }
+
+    // 顯示中獎彈窗
+    function showWinModal(numText) {
+      elModalWinNumber.textContent = numText;
+      elModalWin.classList.remove('hidden');
+      setTimeout(() => {
+        elModalWinBox.classList.remove('scale-95');
+        elModalWinBox.classList.add('scale-100');
+      }, 10);
+    }
+
+    function closeWinModal() {
+      elModalWinBox.classList.remove('scale-100');
+      elModalWinBox.classList.add('scale-95');
+      setTimeout(() => {
+        elModalWin.classList.add('hidden');
+      }, 200);
+    }
+
+    // --- 事件監聽綁定 ---
+    
+    // 生成按鈕
+    elBtnGenerate.addEventListener('click', () => {
+      generateCard();
+    });
+
+    // 重新洗牌按鈕
+    elBtnReshuffle.addEventListener('click', () => {
+      generateCard(true);
+      showToast('已重新打散所有數字與重置刮膜', '🎲');
+    });
+
+    // 一鍵全刮開
+    elBtnRevealAll.addEventListener('click', () => {
+      if (state.cells.length === 0) return;
+      let delay = 0;
+      state.cells.forEach((cell, idx) => {
+        if (!cell.isRevealed()) {
+          setTimeout(() => {
+            cell.revealSmoothly(true);
+          }, delay);
+          delay += 25; // 擬真逐格翻開視覺
+        }
+      });
+      showToast('正在為您一鍵揭曉所有號碼...', '👁️');
+    });
+
+    // 自動指定開關
+    elCheckAutoTarget.addEventListener('change', (e) => {
+      elInputTargetNum.disabled = e.target.checked;
+      if (!e.target.checked) {
+        elInputTargetNum.focus();
+      }
+    });
+
+    // 隨機重骰中獎號碼
+    elBtnDice.addEventListener('click', () => {
+      const max = state.totalCells || 40;
+      const rnd = Math.floor(Math.random() * max) + 1;
+      elInputTargetNum.value = rnd;
+      state.targetNumber = rnd;
+      state.targetNumberFormatted = formatNumber(rnd, state.digits);
+      elDisplayTarget.textContent = state.targetNumberFormatted;
+      showToast(`已重選指定號碼為：${state.targetNumberFormatted}`, '🎯');
+    });
+
+    // 音效開關切換
+    elBtnSoundToggle.addEventListener('click', () => {
+      const muted = Sound.toggleMute();
+      if (muted) {
+        elIconSoundOn.classList.add('hidden');
+        elIconSoundOff.classList.remove('hidden');
+        showToast('音效已靜音', '🔇');
+      } else {
+        elIconSoundOn.classList.remove('hidden');
+        elIconSoundOff.classList.add('hidden');
+        showToast('音效已開啟', '🔊');
+      }
+    });
+
+    // 關閉中獎彈窗
+    elBtnModalClose.addEventListener('click', closeWinModal);
+    elModalWin.addEventListener('click', (e) => {
+      if (e.target === elModalWin) closeWinModal();
+    });
+
+    // 視窗縮放時重新校正畫布尺寸
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        state.cells.forEach(c => c.initDimensions());
+      }, 200);
+    });
+
+    // 啟動防作弊機制與開局生成預設卡片 (8 x 5 = 40 格)
+    window.addEventListener('DOMContentLoaded', () => {
+      initAntiCheat();
+      generateCard();
+    });
+
+  })();
+  </script>
+</body>
+</html>
